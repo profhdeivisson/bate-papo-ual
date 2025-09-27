@@ -5,6 +5,10 @@ import {
   Button,
   Chip,
   Container,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
   IconButton,
   List,
   ListItem,
@@ -17,7 +21,9 @@ import {
 } from '@mui/material';
 import { useRouter } from 'next/router';
 import { useEffect, useRef, useState } from 'react';
-import io from 'socket.io-client';
+/* eslint-disable @typescript-eslint/no-explicit-any */
+import io, { Socket } from 'socket.io-client';
+import type { UserJoinedData, UserLeftData, MessageData, TypingData } from '../../types';
 
 const theme = createTheme({
   typography: {
@@ -30,17 +36,26 @@ const theme = createTheme({
   },
 });
 
-let socket: any;
+interface SystemMessage {
+  system: true;
+  text: string;
+}
+
+type ChatMessage = MessageData | SystemMessage;
+
+let socket: Socket;
 
 export default function ChatRoom() {
-  const [messages, setMessages] = useState<any[]>([]);
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [message, setMessage] = useState('');
   const [nickname, setNickname] = useState('');
   const [connected, setConnected] = useState(false);
   const [typingUsers, setTypingUsers] = useState<string[]>([]);
+  const [openLeaveDialog, setOpenLeaveDialog] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
-  const { room } = router.query;
+  const roomParam = router.query.room;
+  const room = typeof roomParam === 'string' ? roomParam : roomParam?.[0] || '';
   const nicknameRef = useRef('');
 
   useEffect(() => {
@@ -60,21 +75,24 @@ export default function ChatRoom() {
     socket.on('connect', () => {
       console.log('Socket connected');
       setConnected(true);
-      socket.emit('join-room', { room, nickname: nicknameRef.current });
+      const isRejoin = localStorage.getItem('inRoom-' + room) === 'true';
+      socket.emit(isRejoin ? 'rejoin-room' : 'join-room', { room, nickname: nicknameRef.current });
+      localStorage.setItem('inRoom-' + room, 'true');
     });
 
-    socket.on('room-messages', (msgData: any) => {
+    socket.on('previous-messages', (messages: any[]) => {
+      setMessages(messages);
+    });
+
+    socket.on('new-message', (msgData: any) => {
       setMessages(prev => [...prev, msgData]);
     });
 
     socket.on('user-joined', (data: any) => {
-      console.log('Received user-joined:', data, 'my nickname:', nickname);
-      if (data.nickname !== nickname) {
-        setMessages(prev => [
-          ...prev,
-          { system: true, text: `${data.nickname} entrou na sala.` },
-        ]);
-      }
+      setMessages(prev => [
+        ...prev,
+        { system: true, text: `${data.nickname} entrou na sala.` },
+      ]);
     });
 
     socket.on('user-left', (data: any) => {
@@ -142,7 +160,7 @@ export default function ChatRoom() {
               Você: {nickname} | Status:{' '}
               {connected ? 'Conectado' : 'Conectando...'}
             </Typography>
-            <IconButton color="inherit" onClick={() => router.push('/')}>
+            <IconButton color="inherit" onClick={() => setOpenLeaveDialog(true)}>
               <ExitToApp />
             </IconButton>
           </Toolbar>
@@ -157,23 +175,23 @@ export default function ChatRoom() {
                     sx={{
                       p: 2,
                       width: '100%',
-                      bgcolor: msg.system ? 'grey.200' : 'white',
+                      bgcolor: ('system' in msg && msg.system) ? 'grey.200' : 'white',
                     }}
                   >
-                    {msg.system ? (
+                    {('system' in msg && msg.system) ? (
                       <Typography
                         variant="body2"
                         color="text.secondary"
                         fontStyle="italic"
                       >
-                        {msg.text}
+                        {(msg as SystemMessage).text}
                       </Typography>
                     ) : (
                       <Box>
                         <Typography variant="subtitle2" component="strong">
-                          {msg.nickname}:
+                          {(msg as MessageData).nickname}:
                         </Typography>
-                        <Typography variant="body1">{msg.text}</Typography>
+                        <Typography variant="body1">{(msg as MessageData).text}</Typography>
                       </Box>
                     )}
                   </Paper>
@@ -223,6 +241,24 @@ export default function ChatRoom() {
             </Box>
           </Container>
         </Paper>
+        <Dialog open={openLeaveDialog} onClose={() => setOpenLeaveDialog(false)}>
+          <DialogTitle>Sair da Sala</DialogTitle>
+          <DialogContent>
+            <Typography>Tem certeza que deseja sair da sala?</Typography>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={() => setOpenLeaveDialog(false)}>Cancelar</Button>
+            <Button onClick={() => {
+              if (socket) {
+                socket.emit('leave-room', { room, nickname: nicknameRef.current });
+              }
+              localStorage.removeItem('inRoom-' + room);
+              router.push('/');
+            }} color="primary">
+              Sair
+            </Button>
+          </DialogActions>
+        </Dialog>
       </Box>
     </ThemeProvider>
   );
