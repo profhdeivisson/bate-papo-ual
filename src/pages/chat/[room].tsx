@@ -5,6 +5,10 @@ import {
   Button,
   Chip,
   Container,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
   IconButton,
   List,
   ListItem,
@@ -38,6 +42,7 @@ export default function ChatRoom() {
   const [nickname, setNickname] = useState('');
   const [connected, setConnected] = useState(false);
   const [typingUsers, setTypingUsers] = useState<string[]>([]);
+  const [openLeaveDialog, setOpenLeaveDialog] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
   const roomParam = router.query.room;
@@ -149,10 +154,7 @@ export default function ChatRoom() {
               Você: {nickname} | Status:{' '}
               {connected ? 'Conectado' : 'Conectando...'}
             </Typography>
-            <IconButton color="inherit" onClick={() => {
-              localStorage.removeItem('inRoom-' + room);
-              router.push('/');
-            }}>
+            <IconButton color="inherit" onClick={() => setOpenLeaveDialog(true)}>
               <ExitToApp />
             </IconButton>
           </Toolbar>
@@ -233,6 +235,21 @@ export default function ChatRoom() {
             </Box>
           </Container>
         </Paper>
+        <Dialog open={openLeaveDialog} onClose={() => setOpenLeaveDialog(false)}>
+          <DialogTitle>Sair da Sala</DialogTitle>
+          <DialogContent>
+            <Typography>Tem certeza que deseja sair da sala?</Typography>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={() => setOpenLeaveDialog(false)}>Cancelar</Button>
+            <Button onClick={() => {
+              localStorage.removeItem('inRoom-' + room);
+              router.push('/');
+            }} color="primary">
+              Sair
+            </Button>
+          </DialogActions>
+        </Dialog>
       </Box>
     </ThemeProvider>
   );
