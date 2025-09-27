@@ -65,6 +65,7 @@ app.prepare().then(() => {
 
   // In-memory storage for rooms and users (demo only)
   const rooms = new Map(); // room -> Set of sockets
+  const roomUsers = new Map(); // room -> Set of nicknames
   const roomMessages = loadMessages(); // room -> array of messages
 
   io.on('connection', socket => {
@@ -80,15 +81,50 @@ app.prepare().then(() => {
       }
       rooms.get(room).add(socket.id);
 
+      // Track nicknames
+      if (!roomUsers.has(room)) {
+        roomUsers.set(room, new Set());
+      }
+      const isNewUser = !roomUsers.get(room).has(nickname);
+      if (isNewUser) {
+        roomUsers.get(room).add(nickname);
+      }
+
       // Send previous messages
       const messages = roomMessages.get(room) || [];
       socket.emit('previous-messages', messages);
 
-      // Notify others of join
-      socket.to(room).emit('user-joined', { nickname });
-      console.log(`Notifying others in ${room} that ${nickname} joined`);
+      // Notify others of join only if new user
+      if (isNewUser) {
+        socket.to(room).emit('user-joined', { nickname });
+        console.log(`Notifying others in ${room} that ${nickname} joined`);
+      }
 
       console.log(`${nickname} joined room: ${room}`);
+    });
+
+    socket.on('rejoin-room', ({ room, nickname }) => {
+      socket.nickname = nickname;
+      socket.join(room);
+
+      // Track users in room
+      if (!rooms.has(room)) {
+        rooms.set(room, new Set());
+      }
+      rooms.get(room).add(socket.id);
+
+      // Track nicknames
+      if (!roomUsers.has(room)) {
+        roomUsers.set(room, new Set());
+      }
+      roomUsers.get(room).add(nickname); // Always add, since it's rejoin
+
+      // Send previous messages
+      const messages = roomMessages.get(room) || [];
+      socket.emit('previous-messages', messages);
+
+      // No notification for rejoin
+      console.log(`${nickname} rejoined room: ${room}`);
     });
 
     socket.on('send-message', ({ room, text, nickname }) => {
@@ -117,6 +153,17 @@ app.prepare().then(() => {
         rooms.get(room).delete(socket.id);
         if (rooms.get(room).size === 0) {
           rooms.delete(room);
+          roomUsers.delete(room); // Clear nicknames when room is empty
+        } else {
+          // Remove nickname if no more sockets with this nickname
+          const socketsInRoom = rooms.get(room);
+          const hasOtherSocketWithNickname = Array.from(socketsInRoom).some(id => {
+            const s = io.sockets.sockets.get(id);
+            return s && s.nickname === socket.nickname && s.id !== socket.id;
+          });
+          if (!hasOtherSocketWithNickname) {
+            roomUsers.get(room).delete(socket.nickname);
+          }
         }
         // Notify others of leave
         socket.to(room).emit('user-left', { nickname: socket.nickname });

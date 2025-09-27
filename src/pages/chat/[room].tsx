@@ -61,7 +61,9 @@ export default function ChatRoom() {
     socket.on('connect', () => {
       console.log('Socket connected');
       setConnected(true);
-      socket.emit('join-room', { room, nickname: nicknameRef.current });
+      const isRejoin = localStorage.getItem('inRoom-' + room) === 'true';
+      socket.emit(isRejoin ? 'rejoin-room' : 'join-room', { room, nickname: nicknameRef.current });
+      localStorage.setItem('inRoom-' + room, 'true');
     });
 
     socket.on('previous-messages', (messages: any[]) => {
@@ -147,7 +149,10 @@ export default function ChatRoom() {
               Você: {nickname} | Status:{' '}
               {connected ? 'Conectado' : 'Conectando...'}
             </Typography>
-            <IconButton color="inherit" onClick={() => router.push('/')}>
+            <IconButton color="inherit" onClick={() => {
+              localStorage.removeItem('inRoom-' + room);
+              router.push('/');
+            }}>
               <ExitToApp />
             </IconButton>
           </Toolbar>
