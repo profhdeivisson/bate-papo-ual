@@ -2,10 +2,36 @@ import { createServer } from 'http';
 import next from 'next';
 import { Server } from 'socket.io';
 import { parse } from 'url';
+import * as fs from 'fs';
+import * as path from 'path';
 
 const dev = process.env.NODE_ENV !== 'production';
 const hostname = 'localhost';
 const port = process.env.PORT || 3000;
+
+const messagesFile = 'messages.json';
+
+const loadMessages = () => {
+  try {
+    if (fs.existsSync(messagesFile)) {
+      const data = fs.readFileSync(messagesFile, 'utf8');
+      const parsed = JSON.parse(data);
+      return new Map(Object.entries(parsed));
+    }
+  } catch (err) {
+    console.error('Error loading messages:', err);
+  }
+  return new Map();
+};
+
+const saveMessages = (messages) => {
+  try {
+    const data = Object.fromEntries(messages);
+    fs.writeFileSync(messagesFile, JSON.stringify(data, null, 2));
+  } catch (err) {
+    console.error('Error saving messages:', err);
+  }
+};
 
 // Initialize Next.js
 const app = next({ dev, hostname, port });
@@ -39,7 +65,7 @@ app.prepare().then(() => {
 
   // In-memory storage for rooms and users (demo only)
   const rooms = new Map(); // room -> Set of sockets
-  const roomMessages = new Map(); // room -> array of messages
+  const roomMessages = loadMessages(); // room -> array of messages
 
   io.on('connection', socket => {
     console.log('User connected:', socket.id);
@@ -56,7 +82,7 @@ app.prepare().then(() => {
 
       // Send previous messages
       const messages = roomMessages.get(room) || [];
-      socket.emit('room-messages', messages);
+      socket.emit('previous-messages', messages);
 
       // Notify others of join
       socket.to(room).emit('user-joined', { nickname });
@@ -72,7 +98,8 @@ app.prepare().then(() => {
         roomMessages.set(room, []);
       }
       roomMessages.get(room).push(msgData);
-      io.to(room).emit('room-messages', msgData);
+      saveMessages(roomMessages);
+      io.to(room).emit('new-message', msgData);
       console.log(`Message in ${room}: ${text}`);
     });
 

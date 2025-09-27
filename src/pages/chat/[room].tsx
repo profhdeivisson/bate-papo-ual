@@ -40,7 +40,8 @@ export default function ChatRoom() {
   const [typingUsers, setTypingUsers] = useState<string[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
-  const { room } = router.query;
+  const roomParam = router.query.room;
+  const room = typeof roomParam === 'string' ? roomParam : roomParam?.[0] || '';
   const nicknameRef = useRef('');
 
   useEffect(() => {
@@ -63,7 +64,11 @@ export default function ChatRoom() {
       socket.emit('join-room', { room, nickname: nicknameRef.current });
     });
 
-    socket.on('room-messages', (msgData: any) => {
+    socket.on('previous-messages', (messages: any[]) => {
+      setMessages(messages);
+    });
+
+    socket.on('new-message', (msgData: any) => {
       setMessages(prev => [...prev, msgData]);
     });
 
