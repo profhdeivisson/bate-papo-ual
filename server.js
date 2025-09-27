@@ -117,6 +117,9 @@ app.prepare().then(() => {
         if (rooms.get(room).size === 0) {
           rooms.delete(room);
           roomUsers.delete(room);
+          roomMessages.delete(room); // Clear messages when room is empty
+          saveMessages(roomMessages); // Persist the deletion
+          console.log(`Room ${room} deleted`);
         }
       }
       console.log(`${nickname} left room: ${room}`);
@@ -177,6 +180,9 @@ app.prepare().then(() => {
         if (rooms.get(room).size === 0) {
           rooms.delete(room);
           roomUsers.delete(room); // Clear nicknames when room is empty
+          roomMessages.delete(room); // Clear messages when room is empty
+          saveMessages(roomMessages); // Persist the deletion
+          console.log(`Room ${room} deleted`);
         } else {
           // Remove nickname if no more sockets with this nickname
           const socketsInRoom = rooms.get(room);
