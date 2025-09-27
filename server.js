@@ -1,7 +1,7 @@
-const { createServer } = require('http');
-const { parse } = require('url');
-const next = require('next');
-const { Server } = require('socket.io');
+import { createServer } from 'http';
+import next from 'next';
+import { Server } from 'socket.io';
+import { parse } from 'url';
 
 const dev = process.env.NODE_ENV !== 'production';
 const hostname = 'localhost';
@@ -19,7 +19,9 @@ app.prepare().then(() => {
     }
     if (req.url === '/api/rooms' && req.method === 'GET') {
       res.setHeader('Content-Type', 'application/json');
-      const activeRooms = Array.from(rooms.keys()).filter(room => rooms.get(room).size > 0);
+      const activeRooms = Array.from(rooms.keys()).filter(
+        room => rooms.get(room).size > 0
+      );
       res.end(JSON.stringify({ rooms: activeRooms }));
       return;
     }
@@ -39,7 +41,7 @@ app.prepare().then(() => {
   const rooms = new Map(); // room -> Set of sockets
   const roomMessages = new Map(); // room -> array of messages
 
-  io.on('connection', (socket) => {
+  io.on('connection', socket => {
     console.log('User connected:', socket.id);
 
     socket.on('join-room', ({ room, nickname }) => {
@@ -83,7 +85,7 @@ app.prepare().then(() => {
     });
 
     socket.on('disconnect', () => {
-      const room = Array.from(socket.rooms).find((r) => r !== socket.id); // Find the room
+      const room = Array.from(socket.rooms).find(r => r !== socket.id); // Find the room
       if (room && rooms.has(room)) {
         rooms.get(room).delete(socket.id);
         if (rooms.get(room).size === 0) {
@@ -96,7 +98,7 @@ app.prepare().then(() => {
     });
   });
 
-  httpServer.listen(port, (err) => {
+  httpServer.listen(port, err => {
     if (err) throw err;
     console.log(`> Ready on http://${hostname}:${port}`);
   });
