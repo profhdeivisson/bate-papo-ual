@@ -21,7 +21,9 @@ import {
 } from '@mui/material';
 import { useRouter } from 'next/router';
 import { useEffect, useRef, useState } from 'react';
-import io from 'socket.io-client';
+/* eslint-disable @typescript-eslint/no-explicit-any */
+import io, { Socket } from 'socket.io-client';
+import type { UserJoinedData, UserLeftData, MessageData, TypingData } from '../../types';
 
 const theme = createTheme({
   typography: {
@@ -34,10 +36,17 @@ const theme = createTheme({
   },
 });
 
-let socket: any;
+interface SystemMessage {
+  system: true;
+  text: string;
+}
+
+type ChatMessage = MessageData | SystemMessage;
+
+let socket: Socket;
 
 export default function ChatRoom() {
-  const [messages, setMessages] = useState<any[]>([]);
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [message, setMessage] = useState('');
   const [nickname, setNickname] = useState('');
   const [connected, setConnected] = useState(false);
@@ -166,23 +175,23 @@ export default function ChatRoom() {
                     sx={{
                       p: 2,
                       width: '100%',
-                      bgcolor: msg.system ? 'grey.200' : 'white',
+                      bgcolor: ('system' in msg && msg.system) ? 'grey.200' : 'white',
                     }}
                   >
-                    {msg.system ? (
+                    {('system' in msg && msg.system) ? (
                       <Typography
                         variant="body2"
                         color="text.secondary"
                         fontStyle="italic"
                       >
-                        {msg.text}
+                        {(msg as SystemMessage).text}
                       </Typography>
                     ) : (
                       <Box>
                         <Typography variant="subtitle2" component="strong">
-                          {msg.nickname}:
+                          {(msg as MessageData).nickname}:
                         </Typography>
-                        <Typography variant="body1">{msg.text}</Typography>
+                        <Typography variant="body1">{(msg as MessageData).text}</Typography>
                       </Box>
                     )}
                   </Paper>
