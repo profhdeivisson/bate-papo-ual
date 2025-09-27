@@ -94,13 +94,32 @@ app.prepare().then(() => {
       const messages = roomMessages.get(room) || [];
       socket.emit('previous-messages', messages);
 
-      // Notify others of join only if new user
+      // Notify all of join only if new user
       if (isNewUser) {
-        socket.to(room).emit('user-joined', { nickname });
-        console.log(`Notifying others in ${room} that ${nickname} joined`);
+        io.to(room).emit('user-joined', { nickname });
+        console.log(`Notifying all in ${room} that ${nickname} joined`);
       }
 
       console.log(`${nickname} joined room: ${room}`);
+    });
+
+    socket.on('leave-room', ({ room, nickname }) => {
+      socket.left = true;
+      // Notify all of leave
+      io.to(room).emit('user-left', { nickname });
+      // Remove from roomUsers
+      if (roomUsers.has(room)) {
+        roomUsers.get(room).delete(nickname);
+      }
+      // Remove from rooms
+      if (rooms.has(room)) {
+        rooms.get(room).delete(socket.id);
+        if (rooms.get(room).size === 0) {
+          rooms.delete(room);
+          roomUsers.delete(room);
+        }
+      }
+      console.log(`${nickname} left room: ${room}`);
     });
 
     socket.on('rejoin-room', ({ room, nickname }) => {
@@ -148,6 +167,10 @@ app.prepare().then(() => {
     });
 
     socket.on('disconnect', () => {
+      if (socket.left) {
+        console.log('User already left via leave-room:', socket.id);
+        return;
+      }
       const room = Array.from(socket.rooms).find(r => r !== socket.id); // Find the room
       if (room && rooms.has(room)) {
         rooms.get(room).delete(socket.id);
@@ -165,8 +188,8 @@ app.prepare().then(() => {
             roomUsers.get(room).delete(socket.nickname);
           }
         }
-        // Notify others of leave
-        socket.to(room).emit('user-left', { nickname: socket.nickname });
+        // Notify all of leave
+        io.to(room).emit('user-left', { nickname: socket.nickname });
       }
       console.log('User disconnected:', socket.id);
     });

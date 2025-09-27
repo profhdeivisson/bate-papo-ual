@@ -80,13 +80,10 @@ export default function ChatRoom() {
     });
 
     socket.on('user-joined', (data: any) => {
-      console.log('Received user-joined:', data, 'my nickname:', nickname);
-      if (data.nickname !== nickname) {
-        setMessages(prev => [
-          ...prev,
-          { system: true, text: `${data.nickname} entrou na sala.` },
-        ]);
-      }
+      setMessages(prev => [
+        ...prev,
+        { system: true, text: `${data.nickname} entrou na sala.` },
+      ]);
     });
 
     socket.on('user-left', (data: any) => {
@@ -243,6 +240,9 @@ export default function ChatRoom() {
           <DialogActions>
             <Button onClick={() => setOpenLeaveDialog(false)}>Cancelar</Button>
             <Button onClick={() => {
+              if (socket) {
+                socket.emit('leave-room', { room, nickname: nicknameRef.current });
+              }
               localStorage.removeItem('inRoom-' + room);
               router.push('/');
             }} color="primary">
